@@ -1,0 +1,9 @@
+[package]
+name = "lemur-locator"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+diesel = { version = "2.2.1", features = ["sqlite", "chrono"] }
+dotenv = "0.15.0"
+chrono = { version = "0.4.19", features = ["serde"] }
