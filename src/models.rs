@@ -28,7 +28,6 @@ impl NewCard {
             interval: 0,
         }
     }
-
 }
 
 #[derive(Queryable, Insertable, AsChangeset, Debug)]

@@ -1,9 +1,8 @@
-
+use std::env;
 
 use diesel::prelude::*;
 use diesel::sqlite::SqliteConnection;
 use dotenv::dotenv;
-use std::env;
 
 use crate::models::{Card, NewCard};
 use crate::schema::cards;
@@ -44,4 +43,51 @@ pub fn update_card(conn: &mut SqliteConnection, card_id: i32, updated_card: &Car
 
 pub fn delete_card(conn: &mut SqliteConnection, card_id: i32) -> QueryResult<usize> {
     diesel::delete(cards::table.find(card_id)).execute(conn)
+}
+
+#[cfg(test)]
+mod tests {
+    use diesel::connection::Connection;
+    use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
+
+    use super::*;
+
+    pub const MIGRATIONS: EmbeddedMigrations = embed_migrations!();
+
+    fn establish_test_connection() -> SqliteConnection {
+        let mut conn = SqliteConnection::establish(":memory:")
+            .unwrap_or_else(|_| panic!("Error connecting to :memory:"));
+        conn.run_pending_migrations(MIGRATIONS).unwrap();
+        conn
+    }
+
+    #[test]
+    fn test_create_card() {
+        let mut conn = establish_test_connection();
+        conn.begin_test_transaction().unwrap();
+
+        let card = create_card(&mut conn, "Tokio".to_string(), 35.6895, 139.6917).unwrap();
+        assert_eq!(card.place_name, "Tokio");
+    }
+
+    #[test]
+    fn test_get_all_cards() {
+        let mut conn = establish_test_connection();
+        conn.begin_test_transaction().unwrap();
+
+        create_card(&mut conn, "London".to_string(), 51.5074, 0.1278).unwrap();
+        let cards = get_all_cards(&mut conn).unwrap();
+        assert_eq!(cards.len(), 1);
+        assert_eq!(cards[0].place_name, "London");
+    }
+
+    #[test]
+    fn test_deletion() {
+        let mut conn = establish_test_connection();
+        conn.begin_test_transaction().unwrap();
+
+        let card = create_card(&mut conn, "Paris".to_string(), 48.8566, 2.3522).unwrap();
+        let deleted = delete_card(&mut conn, card.id).unwrap();
+        assert_eq!(deleted, 1);
+    }
 }
