@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>New Card - Lemur Locator</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css"/>
+    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+    <style>
+        #map {
+            height: 800px;
+            width: 100%;
+        }
+    </style>
+</head>
+<body>
+<h1>Create a New Card</h1>
+{% if message %}
+<p style="color: green;">{{ message }}</p>
+{% endif %}
+{% if error %}
+<p style="color: red;">{{ error }}</p>
+{% endif %}
+<form method="post" id="newCardForm">
+    <label for="place_name">Place Name:</label>
+    <input type="text" id="place_name" name="place_name" required><br><br>
+
+    <input type="hidden" id="latitude" name="latitude" required>
+    <input type="hidden" id="longitude" name="longitude" required>
+
+    <div id="map"></div>
+    <p>Click on the map to set the location</p>
+
+    <input type="submit" value="Create Card">
+</form>
+
+<script>
+    var map = L.map('map').setView([51.3384, 12.3861], 13);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+    }).addTo(map);
+
+    var marker;
+
+    map.on('click', function (e) {
+        if (marker) {
+            map.removeLayer(marker);
+        }
+        marker = L.marker(e.latlng).addTo(map);
+        document.getElementById('latitude').value = e.latlng.lat.toFixed(6);
+        document.getElementById('longitude').value = e.latlng.lng.toFixed(6);
+    });
+
+    document.getElementById('newCardForm').onsubmit = function (e) {
+        if (!document.getElementById('latitude').value || !document.getElementById('longitude').value) {
+            e.preventDefault();
+            alert('Please select a location on the map');
+        }
+    };
+</script>
+</body>
+</html>
