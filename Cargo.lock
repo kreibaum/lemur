@@ -686,6 +686,7 @@ dependencies = [
  "diesel",
  "diesel_migrations",
  "dotenv",
+ "rand",
  "serde",
  "tera",
  "tokio",

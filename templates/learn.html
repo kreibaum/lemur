@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Learn - Lemur Locator</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css"/>
+    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+    <style>
+        #map {
+            height: 800px;
+            width: 100%;
+        }
+    </style>
+</head>
+<body>
+<h1>Learn</h1>
+<h2>Where is {{ card.place_name }}?</h2>
+<div id="map"></div>
+<form id="answerForm">
+    <input type="hidden" id="cardId" name="id" value="{{ card.id }}">
+    <input type="hidden" id="latitude" name="latitude">
+    <input type="hidden" id="longitude" name="longitude">
+    <button type="submit" id="submitBtn" disabled>Submit Answer</button>
+</form>
+<div id="result"></div>
+
+<script>
+    var map = L.map('map').setView([51.3384, 12.3861], 13);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+    }).addTo(map);
+
+    var marker;
+
+    map.on('click', function (e) {
+        if (marker) {
+            map.removeLayer(marker);
+        }
+        marker = L.marker(e.latlng).addTo(map);
+        document.getElementById('latitude').value = e.latlng.lat.toFixed(6);
+        document.getElementById('longitude').value = e.latlng.lng.toFixed(6);
+        document.getElementById('submitBtn').disabled = false;
+    });
+
+    document.getElementById('answerForm').onsubmit = function (e) {
+        e.preventDefault();
+        var formData = new FormData(this);
+        var urlEncodedData = new URLSearchParams(formData);
+        console.log(formData);
+
+        fetch('/learn', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded'
+            },
+            body: urlEncodedData
+        })
+            .then(response => response.text())
+            .then(result => {
+                document.getElementById('result').textContent = result;
+            });
+    };
+</script>
+</body>
+</html>
