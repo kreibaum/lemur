@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use axum::{Form, response::Html, Router, routing::get};
 use axum::extract::State;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use tera::Tera;
 
 mod db;
@@ -24,6 +24,7 @@ async fn main() {
     // Build our application with a route
     let app = Router::new()
         .route("/new_card", get(new_card_form).post(create_new_card))
+        .route("/all_cards", get(all_cards))
         .with_state(tera);
 
     // Run our application
@@ -64,4 +65,35 @@ async fn create_new_card(
             Html(rendered)
         }
     }
+}
+
+
+#[derive(Serialize)]
+struct CardData {
+    id: i32,
+    place_name: String,
+    latitude: f32,
+    longitude: f32,
+}
+
+
+async fn all_cards(State(tera): State<Arc<Tera>>) -> Html<String> {
+    let mut conn = db::establish_connection();
+    let cards = db::get_all_cards(&mut conn).unwrap_or_else(|_| vec![]);
+
+    let card_data: Vec<CardData> = cards
+        .into_iter()
+        .map(|card| CardData {
+            id: card.id,
+            place_name: card.place_name,
+            latitude: card.latitude,
+            longitude: card.longitude,
+        })
+        .collect();
+
+    let mut context = tera::Context::new();
+    context.insert("cards", &card_data);
+
+    let rendered = tera.render("all_cards.html", &context).unwrap();
+    Html(rendered)
 }
