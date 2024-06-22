@@ -6,6 +6,7 @@ use axum::http::StatusCode;
 use axum::routing::post;
 use serde::{Deserialize, Serialize};
 use tera::Tera;
+use tower_http::compression::CompressionLayer;
 
 use crate::database_connection_extractor::DatabaseConnection;
 
@@ -33,6 +34,7 @@ async fn main() {
         .route("/all_cards", get(all_cards))
         .route("/learn", get(learn_page))
         .route("/api/check_answer", post(check_answer))
+        .layer(CompressionLayer::new())
         .with_state(tera);
 
     // Run our application
