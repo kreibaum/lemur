@@ -1,8 +1,9 @@
 use std::sync::Arc;
 
-use axum::{Form, response::Html, Router, routing::get};
+use axum::{Form, Json, response::Html, Router, routing::get};
 use axum::extract::State;
 use axum::http::StatusCode;
+use axum::routing::post;
 use serde::{Deserialize, Serialize};
 use tera::Tera;
 
@@ -26,7 +27,8 @@ async fn main() {
     let app = Router::new()
         .route("/new_card", get(new_card_form).post(create_new_card))
         .route("/all_cards", get(all_cards))
-        .route("/learn", get(learn_page).post(check_answer))
+        .route("/learn", get(learn_page))
+        .route("/api/check_answer", post(check_answer))
         .with_state(tera);
 
     // Run our application
@@ -136,7 +138,16 @@ struct AnswerSubmission {
     longitude: f32,
 }
 
-async fn check_answer(Form(submission): Form<AnswerSubmission>) -> (StatusCode, String) {
+
+#[derive(Serialize)]
+struct AnswerResponse {
+    is_correct: bool,
+    message: String,
+    actual_latitude: f64,
+    actual_longitude: f64,
+}
+
+async fn check_answer(Form(submission): Form<AnswerSubmission>) -> (StatusCode, Json<AnswerResponse>) {
     let mut conn = db::establish_connection();
     if let Ok(card) = db::get_card(&mut conn, submission.id) {
         let distance = haversine_distance(
@@ -146,13 +157,24 @@ async fn check_answer(Form(submission): Form<AnswerSubmission>) -> (StatusCode, 
 
         println!("Distance: {:.2}m", distance);
 
-        if distance <= 250.0 {
-            (StatusCode::OK, "Correct! Well done!".to_string())
+        let (is_correct, message) = if distance <= 250.0 {
+            (true, "Correct! Well done!".to_string())
         } else {
-            (StatusCode::OK, format!("Incorrect. The location was {:.2}m away.", distance))
-        }
+            (false, format!("Incorrect. The location was {:.2}m away.", distance))
+        };
+        (StatusCode::OK, Json(AnswerResponse {
+            is_correct,
+            message,
+            actual_latitude: card.latitude as f64,
+            actual_longitude: card.longitude as f64,
+        }))
     } else {
-        (StatusCode::NOT_FOUND, "Card not found".to_string())
+        (StatusCode::NOT_FOUND, Json(AnswerResponse {
+            is_correct: false,
+            message: "Card not found".to_string(),
+            actual_latitude: 0.0,
+            actual_longitude: 0.0,
+        }))
     }
 }
 

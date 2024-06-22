@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Learn - Lemur Locator</title>
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css"/>
-    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <style>
         #map {
             height: 800px;
@@ -31,31 +31,35 @@
         zoom: 13,
         dragging: false,
         touchZoom: false,
-        scrollWheelZoom: false,
+        scrollWheelZoom: true,
         doubleClickZoom: false,
         boxZoom: false,
         keyboard: false,
         zoomControl: false
     });
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
-        subdomains: 'abcd',
-        minZoom: 0,
-        maxZoom: 20,
-        ext: 'png'
+    // Find layers on https://leaflet-extras.github.io/leaflet-providers/preview/
+    L.tileLayer('https://tiles.stadiamaps.com/tiles/stamen_watercolor/{z}/{x}/{y}.{ext}', {
+        minZoom: 1,
+        maxZoom: 16,
+        attribution: '&copy; <a href="https://www.stadiamaps.com/" target="_blank">Stadia Maps</a> &copy; <a href="https://www.stamen.com/" target="_blank">Stamen Design</a> &copy; <a href="https://openmaptiles.org/" target="_blank">OpenMapTiles</a> &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+        ext: 'jpg'
     }).addTo(map);
 
-    var marker;
+    var user_marker;
 
     map.on('click', function (e) {
-        if (marker) {
-            map.removeLayer(marker);
+        if (user_marker) {
+            map.removeLayer(user_marker);
         }
-        marker = L.marker(e.latlng).addTo(map);
+        user_marker = L.marker(e.latlng).addTo(map);
         document.getElementById('latitude').value = e.latlng.lat.toFixed(6);
         document.getElementById('longitude').value = e.latlng.lng.toFixed(6);
         document.getElementById('submitBtn').disabled = false;
     });
+
+    function handleResponse(result) {
+        document.getElementById('result').textContent = result.message;
+    }
 
     document.getElementById('answerForm').onsubmit = function (e) {
         e.preventDefault();
@@ -63,17 +67,15 @@
         var urlEncodedData = new URLSearchParams(formData);
         console.log(formData);
 
-        fetch('/learn', {
+        fetch('/api/check_answer', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/x-www-form-urlencoded'
             },
             body: urlEncodedData
         })
-            .then(response => response.text())
-            .then(result => {
-                document.getElementById('result').textContent = result;
-            });
+            .then(response => response.json())
+            .then(handleResponse);
     };
 </script>
 </body>
