@@ -3,9 +3,10 @@ use std::sync::Arc;
 use axum::{Form, Json, response::Html, Router, routing::get};
 use axum::extract::State;
 use axum::http::StatusCode;
+use axum::response::IntoResponse;
 use axum::routing::post;
 use serde::{Deserialize, Serialize};
-use tera::Tera;
+use tera::{Context, Tera};
 use tower_http::compression::CompressionLayer;
 
 use crate::database_connection_extractor::DatabaseConnection;
@@ -30,6 +31,7 @@ async fn main() {
 
     // Build our application with a route
     let app = Router::new()
+        .route("/", get(home_page))
         .route("/new_card", get(new_card_form).post(create_new_card))
         .route("/all_cards", get(all_cards))
         .route("/learn", get(learn_page))
@@ -40,6 +42,14 @@ async fn main() {
     // Run our application
     let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
     axum::serve(listener, app).await.unwrap();
+}
+
+async fn home_page(State(tera): State<Arc<Tera>>) -> impl IntoResponse {
+    let context = Context::new();  // Create an empty context, or add data if needed
+    let body = tera.render("index.html", &context)
+        .unwrap_or_else(|err| format!("Template error: {}", err));
+
+    Html(body).into_response()
 }
 
 async fn new_card_form(State(tera): State<Arc<Tera>>) -> Html<String> {
