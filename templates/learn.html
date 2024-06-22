@@ -6,6 +6,7 @@
     <title>Learn - Lemur Locator</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script> let card = {{ card | json_encode() | safe }} </script>
     <style>
         #map {
             height: 800px;
@@ -21,7 +22,6 @@
     <input type="hidden" id="cardId" name="id" value="{{ card.id }}">
     <input type="hidden" id="latitude" name="latitude">
     <input type="hidden" id="longitude" name="longitude">
-    <button type="submit" id="submitBtn" disabled>Submit Answer</button>
 </form>
 <div id="result"></div>
 
@@ -44,8 +44,6 @@
         return R * c * 1000; // Convert to meters
     }
 
-    var card = {{ card | json_encode() | safe }};
-
     var map = L.map('map', {
         center: [51.3384, 12.3861],
         zoom: 13,
@@ -66,8 +64,10 @@
     }).addTo(map);
 
     var green_marker, red_marker;
+    /** @type {'WAITING_FOR_GUESS' | 'CORRECT' | 'INCORRECT'} */
+    let status = 'WAITING_FOR_GUESS'
 
-    map.on('click', function (e) {
+    function place_markers(e) {
         if (green_marker) {
             map.removeLayer(green_marker);
         }
@@ -81,7 +81,6 @@
         let distance = haversineDistance(card.latitude, card.longitude, latitude_guess, longitude_guess);
         console.log('Distance:', distance);
 
-
         // Create a green marker in the correct position.
         green_marker = L.marker([card.latitude, card.longitude], {
             icon: L.icon({
@@ -93,8 +92,9 @@
                 shadowSize: [41, 41]
             })
         }).addTo(map);
+        status = 'CORRECT';
 
-        if (distance > 250 ) {
+        if (distance > 250) {
             // Create a red marker in the incorrect position.
             red_marker = L.marker(e.latlng, {
                 icon: L.icon({
@@ -106,23 +106,26 @@
                     shadowSize: [41, 41]
                 })
             }).addTo(map);
+            status = 'INCORRECT';
         }
 
         document.getElementById('latitude').value = latitude_guess;
         document.getElementById('longitude').value = longitude_guess;
-
-        document.getElementById('submitBtn').disabled = false;
-    });
-
-    function handleResponse(result) {
-        document.getElementById('result').textContent = result.message;
     }
 
-    document.getElementById('answerForm').onsubmit = function (e) {
-        e.preventDefault();
-        var formData = new FormData(this);
+    map.on('click', function (e) {
+        if (status === 'WAITING_FOR_GUESS') {
+            place_markers(e);
+            submitAnswer();
+        } else {
+            // Reload page
+            location.reload();
+        }
+    });
+
+    function submitAnswer() {
+        var formData = new FormData(document.getElementById('answerForm'));
         var urlEncodedData = new URLSearchParams(formData);
-        console.log(formData);
 
         fetch('/api/check_answer', {
             method: 'POST',
@@ -133,7 +136,11 @@
         })
             .then(response => response.json())
             .then(handleResponse);
-    };
+    }
+
+    function handleResponse(result) {
+        document.getElementById('result').textContent = result.message;
+    }
 </script>
 </body>
 </html>
