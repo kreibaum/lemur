@@ -13,6 +13,7 @@ mod db;
 mod models;
 mod schema;
 mod database_connection_extractor;
+mod gis;
 
 #[tokio::main(flavor = "current_thread")]
 async fn main() {
@@ -159,7 +160,7 @@ async fn check_answer(
     Form(submission): Form<AnswerSubmission>,
 ) -> (StatusCode, Json<AnswerResponse>) {
     if let Ok(card) = db::get_card(&mut conn, submission.id) {
-        let distance = haversine_distance(
+        let distance = gis::haversine_distance(
             card.latitude, card.longitude,
             submission.latitude, submission.longitude,
         );
@@ -185,18 +186,4 @@ async fn check_answer(
             actual_longitude: 0.0,
         }))
     }
-}
-
-fn haversine_distance(lat1: f32, lon1: f32, lat2: f32, lon2: f32) -> f32 {
-    const R: f32 = 6371.0; // Earth's radius in kilometers
-
-    let dlat1 = lat1.to_radians();
-    let dlat2 = lat2.to_radians();
-    let dlat = (lat2 - lat1).to_radians();
-    let dlon = (lon2 - lon1).to_radians();
-
-    let a = (dlat / 2.0).sin().powi(2) + dlat1.cos() * dlat2.cos() * (dlon / 2.0).sin().powi(2);
-    let c = 2.0 * a.sqrt().atan2((1.0 - a).sqrt());
-
-    R * c * 1000.0 // Convert to meters
 }
