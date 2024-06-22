@@ -7,9 +7,12 @@ use axum::routing::post;
 use serde::{Deserialize, Serialize};
 use tera::Tera;
 
+use crate::database_connection_extractor::DatabaseConnection;
+
 mod db;
 mod models;
 mod schema;
+mod database_connection_extractor;
 
 #[tokio::main(flavor = "current_thread")]
 async fn main() {
@@ -52,9 +55,9 @@ struct NewCard {
 
 async fn create_new_card(
     State(tera): State<Arc<Tera>>,
+    DatabaseConnection(mut conn): DatabaseConnection,
     Form(new_card): Form<NewCard>,
 ) -> Html<String> {
-    let mut conn = db::establish_connection();
     match db::create_card(&mut conn, new_card.place_name, new_card.latitude, new_card.longitude) {
         Ok(_) => {
             let mut context = tera::Context::new();
@@ -81,8 +84,8 @@ struct CardData {
 }
 
 
-async fn all_cards(State(tera): State<Arc<Tera>>) -> Html<String> {
-    let mut conn = db::establish_connection();
+async fn all_cards(State(tera): State<Arc<Tera>>,
+                   DatabaseConnection(mut conn): DatabaseConnection, ) -> Html<String> {
     let cards = db::get_all_cards(&mut conn).unwrap_or_else(|_| vec![]);
 
     let card_data: Vec<CardData> = cards
@@ -109,10 +112,10 @@ struct LearnPageData {
     place_name: String,
 }
 
-async fn learn_page(State(tera): State<Arc<Tera>>) -> Html<String> {
+async fn learn_page(State(tera): State<Arc<Tera>>,
+                    DatabaseConnection(mut conn): DatabaseConnection, ) -> Html<String> {
     use rand::prelude::SliceRandom;
 
-    let mut conn = db::establish_connection();
     let cards = db::get_all_cards(&mut conn).unwrap_or_else(|_| vec![]);
 
     if let Some(card) = cards.choose(&mut rand::thread_rng()) {
@@ -147,8 +150,10 @@ struct AnswerResponse {
     actual_longitude: f64,
 }
 
-async fn check_answer(Form(submission): Form<AnswerSubmission>) -> (StatusCode, Json<AnswerResponse>) {
-    let mut conn = db::establish_connection();
+async fn check_answer(
+    DatabaseConnection(mut conn): DatabaseConnection,
+    Form(submission): Form<AnswerSubmission>,
+) -> (StatusCode, Json<AnswerResponse>) {
     if let Ok(card) = db::get_card(&mut conn, submission.id) {
         let distance = haversine_distance(
             card.latitude, card.longitude,
