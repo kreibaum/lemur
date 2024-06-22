@@ -110,6 +110,8 @@ async fn all_cards(State(tera): State<Arc<Tera>>,
 struct LearnPageData {
     id: i32,
     place_name: String,
+    latitude: f32,
+    longitude: f32,
 }
 
 async fn learn_page(State(tera): State<Arc<Tera>>,
@@ -122,6 +124,8 @@ async fn learn_page(State(tera): State<Arc<Tera>>,
         let learn_data = LearnPageData {
             id: card.id,
             place_name: card.place_name.clone(),
+            latitude: card.latitude,
+            longitude: card.longitude,
         };
 
         let mut context = tera::Context::new();

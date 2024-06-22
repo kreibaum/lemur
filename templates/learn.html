@@ -25,7 +25,27 @@
 </form>
 <div id="result"></div>
 
-<script>
+<script type="text/javascript">
+    function haversineDistance(lat1, lon1, lat2, lon2) {
+        const R = 6371; // Earth's radius in kilometers
+
+        const toRadians = (degrees) => degrees * Math.PI / 180;
+
+        const lat1Rad = toRadians(lat1);
+        const lat2Rad = toRadians(lat2);
+        const dlat = toRadians(lat2 - lat1);
+        const dlon = toRadians(lon2 - lon1);
+
+        const a = Math.sin(dlat / 2) ** 2 +
+            Math.cos(lat1Rad) * Math.cos(lat2Rad) *
+            Math.sin(dlon / 2) ** 2;
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+        return R * c * 1000; // Convert to meters
+    }
+
+    var card = {{ card | json_encode() | safe }};
+
     var map = L.map('map', {
         center: [51.3384, 12.3861],
         zoom: 13,
@@ -45,15 +65,52 @@
         ext: 'jpg'
     }).addTo(map);
 
-    var user_marker;
+    var green_marker, red_marker;
 
     map.on('click', function (e) {
-        if (user_marker) {
-            map.removeLayer(user_marker);
+        if (green_marker) {
+            map.removeLayer(green_marker);
         }
-        user_marker = L.marker(e.latlng).addTo(map);
-        document.getElementById('latitude').value = e.latlng.lat.toFixed(6);
-        document.getElementById('longitude').value = e.latlng.lng.toFixed(6);
+        if (red_marker) {
+            map.removeLayer(red_marker);
+        }
+
+        let latitude_guess = e.latlng.lat.toFixed(6);
+        let longitude_guess = e.latlng.lng.toFixed(6);
+
+        let distance = haversineDistance(card.latitude, card.longitude, latitude_guess, longitude_guess);
+        console.log('Distance:', distance);
+
+
+        // Create a green marker in the correct position.
+        green_marker = L.marker([card.latitude, card.longitude], {
+            icon: L.icon({
+                iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-green.png',
+                shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
+                iconSize: [25, 41],
+                iconAnchor: [12, 41],
+                popupAnchor: [1, -34],
+                shadowSize: [41, 41]
+            })
+        }).addTo(map);
+
+        if (distance > 250 ) {
+            // Create a red marker in the incorrect position.
+            red_marker = L.marker(e.latlng, {
+                icon: L.icon({
+                    iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png',
+                    shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
+                    iconSize: [25, 41],
+                    iconAnchor: [12, 41],
+                    popupAnchor: [1, -34],
+                    shadowSize: [41, 41]
+                })
+            }).addTo(map);
+        }
+
+        document.getElementById('latitude').value = latitude_guess;
+        document.getElementById('longitude').value = longitude_guess;
+
         document.getElementById('submitBtn').disabled = false;
     });
 
