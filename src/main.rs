@@ -119,7 +119,7 @@ async fn learn_page(State(tera): State<Arc<Tera>>,
                     DatabaseConnection(mut conn): DatabaseConnection, ) -> Html<String> {
     use rand::prelude::SliceRandom;
 
-    let cards = db::get_all_cards(&mut conn).unwrap_or_else(|_| vec![]);
+    let cards = db::get_all_due_cards(&mut conn).unwrap_or_else(|_| vec![]);
 
     if let Some(card) = cards.choose(&mut rand::thread_rng()) {
         let learn_data = LearnPageData {
@@ -159,7 +159,7 @@ async fn check_answer(
     DatabaseConnection(mut conn): DatabaseConnection,
     Form(submission): Form<AnswerSubmission>,
 ) -> (StatusCode, Json<AnswerResponse>) {
-    if let Ok(card) = db::get_card(&mut conn, submission.id) {
+    if let Ok(mut card) = db::get_card(&mut conn, submission.id) {
         let distance = gis::haversine_distance(
             card.latitude, card.longitude,
             submission.latitude, submission.longitude,
@@ -168,9 +168,19 @@ async fn check_answer(
         println!("Distance: {:.2}m", distance);
 
         let (is_correct, message) = if distance <= 250.0 {
+            card.review_passed();
             (true, "Correct! Well done!".to_string())
         } else {
+            card.review_failed();
             (false, format!("Incorrect. The location was {:.2}m away.", distance))
+        };
+        let Ok(card) = db::update_card(&mut conn, &card) else {
+            return (StatusCode::INTERNAL_SERVER_ERROR, Json(AnswerResponse {
+                is_correct: false,
+                message: "Error updating card".to_string(),
+                actual_latitude: 0.0,
+                actual_longitude: 0.0,
+            }));
         };
         (StatusCode::OK, Json(AnswerResponse {
             is_correct,

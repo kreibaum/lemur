@@ -29,16 +29,23 @@ pub fn get_all_cards(conn: &mut SqliteConnection) -> QueryResult<Vec<Card>> {
     cards::table.load::<Card>(conn)
 }
 
+pub fn get_all_due_cards(conn: &mut SqliteConnection) -> QueryResult<Vec<Card>> {
+    let now = chrono::Utc::now().naive_utc();
+    cards::table
+        .filter(cards::next_review_at.le(now))
+        .load::<Card>(conn)
+}
+
 pub fn get_card(conn: &mut SqliteConnection, card_id: i32) -> QueryResult<Card> {
     cards::table.find(card_id).first::<Card>(conn)
 }
 
-pub fn update_card(conn: &mut SqliteConnection, card_id: i32, updated_card: &Card) -> QueryResult<Card> {
-    diesel::update(cards::table.find(card_id))
+pub fn update_card(conn: &mut SqliteConnection, updated_card: &Card) -> QueryResult<Card> {
+    diesel::update(cards::table.find(updated_card.id))
         .set(updated_card)
         .execute(conn)?;
 
-    cards::table.find(card_id).first(conn)
+    cards::table.find(updated_card.id).first(conn)
 }
 
 pub fn delete_card(conn: &mut SqliteConnection, card_id: i32) -> QueryResult<usize> {
