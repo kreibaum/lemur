@@ -30,7 +30,7 @@ impl NewCard {
     }
 }
 
-#[derive(Queryable, Insertable, AsChangeset, Debug)]
+#[derive(Queryable, Insertable, AsChangeset, Debug, Clone)]
 #[diesel(table_name = crate::schema::cards)]
 #[diesel(check_for_backend(diesel::sqlite::Sqlite))]
 pub struct Card {

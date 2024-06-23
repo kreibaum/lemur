@@ -118,8 +118,8 @@
             place_markers(e);
             submitAnswer();
         } else {
-            // Redirect to /learn to get a new card.
-            window.location.href = '/learn';
+            // Redirect to the next card.
+            window.location.href = next_card_url();
         }
     });
 
@@ -141,6 +141,22 @@
     function handleResponse(result) {
         document.getElementById('result').textContent = result.message;
     }
+
+    function next_card_url() {
+        if (card.next_id > 0) {
+            return `/learn/${card.next_id}?r=${card.cache_buster}`;
+        }
+        return '/learn'; // Fall back to the server based redirect
+    }
+
+    function prefetchNextCard() {
+        if (card.id > 0) {
+            fetch(next_card_url(), {method: 'GET'});
+        }
+    }
+
+    // Call prefetchNextCard after a short delay
+    setTimeout(prefetchNextCard, 200);
 </script>
 </body>
 </html>

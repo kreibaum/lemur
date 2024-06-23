@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use axum::{Form, Json, response::Html, Router, routing::get};
 use axum::extract::{Path, State};
-use axum::http::StatusCode;
+use axum::http::{HeaderMap, HeaderValue, StatusCode};
 use axum::response::{IntoResponse, Redirect};
 use axum::routing::post;
 use diesel::SqliteConnection;
@@ -133,6 +133,20 @@ struct LearnPageData {
     place_name: String,
     latitude: f32,
     longitude: f32,
+    next_id: i32,
+    /// Should be a 4-character random string. Alpha-numeric characters only.
+    cache_buster: String,
+}
+
+fn cache_buster() -> String {
+    use rand::distributions::Alphanumeric;
+    use rand::{Rng, thread_rng};
+
+    thread_rng()
+        .sample_iter(&Alphanumeric)
+        .take(4)
+        .map(char::from)
+        .collect()
 }
 
 async fn select_random_card(DatabaseConnection(mut conn): DatabaseConnection) -> Result<Redirect, StatusCode> {
@@ -145,11 +159,11 @@ async fn select_random_card(DatabaseConnection(mut conn): DatabaseConnection) ->
     }
 }
 
-fn select_random_card_fkt(mut conn: &mut SqliteConnection, exclude: i32) -> Result<Option<&Card>, StatusCode> {
+fn select_random_card_fkt(mut conn: &mut SqliteConnection, exclude: i32) -> Result<Option<Card>, StatusCode> {
     use rand::prelude::SliceRandom;
 
     let cards = db::get_all_due_cards(&mut conn).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
-        .iter().filter(|card| card.id != exclude).collect::<Vec<_>>();
+        .into_iter().filter(|card| card.id != exclude).collect::<Vec<_>>();
     let random_due_card = cards.choose(&mut rand::thread_rng());
 
     Ok(random_due_card.cloned())
@@ -160,6 +174,11 @@ async fn learn_page(
     DatabaseConnection(mut conn): DatabaseConnection,
     Path(id): Path<i32>,
 ) -> impl IntoResponse {
+    let next_id = match select_random_card_fkt(&mut conn, id) {
+        Ok(Some(card)) => card.id,
+        _ => -1,
+    };
+
     match db::get_card(&mut conn, id) {
         Ok(card) => {
             let learn_data = LearnPageData {
@@ -167,13 +186,20 @@ async fn learn_page(
                 place_name: card.place_name,
                 latitude: card.latitude,
                 longitude: card.longitude,
+                next_id,
+                cache_buster: cache_buster(),
             };
 
             let mut context = Context::new();
             context.insert("card", &learn_data);
 
             let rendered = tera.render("learn.html", &context).unwrap();
-            Html(rendered).into_response()
+
+            // Create a response with appropriate cache control headers
+            let mut headers = HeaderMap::new();
+            headers.insert("Cache-Control", HeaderValue::from_static("public, max-age=300")); // Cache for 5 minutes
+
+            (headers, Html(rendered)).into_response()
         }
         Err(_) => (StatusCode::NOT_FOUND, "Card not found").into_response(),
     }
