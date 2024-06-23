@@ -36,6 +36,14 @@ pub fn get_all_due_cards(conn: &mut SqliteConnection) -> QueryResult<Vec<Card>> 
         .load::<Card>(conn)
 }
 
+pub fn count_due_cards(conn: &mut SqliteConnection) -> QueryResult<i64> {
+    let now = chrono::Utc::now().naive_utc();
+    cards::table
+        .filter(cards::next_review_at.le(now))
+        .count()
+        .get_result(conn)
+}
+
 pub fn get_card(conn: &mut SqliteConnection, card_id: i32) -> QueryResult<Card> {
     cards::table.find(card_id).first::<Card>(conn)
 }

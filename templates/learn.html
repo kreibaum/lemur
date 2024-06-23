@@ -118,8 +118,8 @@
             place_markers(e);
             submitAnswer();
         } else {
-            // Reload page
-            location.reload();
+            // Redirect to /learn to get a new card.
+            window.location.href = '/learn';
         }
     });
 

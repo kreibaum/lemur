@@ -44,5 +44,14 @@
     <a href="/all_cards">View All Cards</a>
     <a href="/learn">Start Learning</a>
 </nav>
+<p>
+    {% if due_card_count > 1 %}
+    You have {{ due_card_count }} cards to learn.
+    {% elif due_card_count == 1 %}
+    You have 1 card to learn.
+    {% else %}
+    You have no cards to learn.
+    {% endif %}
+</p>
 </body>
 </html>

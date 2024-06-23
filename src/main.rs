@@ -1,15 +1,17 @@
 use std::sync::Arc;
 
 use axum::{Form, Json, response::Html, Router, routing::get};
-use axum::extract::State;
+use axum::extract::{Path, State};
 use axum::http::StatusCode;
-use axum::response::IntoResponse;
+use axum::response::{IntoResponse, Redirect};
 use axum::routing::post;
+use diesel::SqliteConnection;
 use serde::{Deserialize, Serialize};
 use tera::{Context, Tera};
 use tower_http::compression::CompressionLayer;
 
 use crate::database_connection_extractor::DatabaseConnection;
+use crate::models::Card;
 
 mod db;
 mod models;
@@ -34,7 +36,8 @@ async fn main() {
         .route("/", get(home_page))
         .route("/new_card", get(new_card_form).post(create_new_card))
         .route("/all_cards", get(all_cards))
-        .route("/learn", get(learn_page))
+        .route("/learn", get(select_random_card))
+        .route("/learn/:id", get(learn_page))
         .route("/api/check_answer", post(check_answer))
         .layer(CompressionLayer::new())
         .with_state(tera);
@@ -44,8 +47,13 @@ async fn main() {
     axum::serve(listener, app).await.unwrap();
 }
 
-async fn home_page(State(tera): State<Arc<Tera>>) -> impl IntoResponse {
-    let context = Context::new();  // Create an empty context, or add data if needed
+async fn home_page(
+    State(tera): State<Arc<Tera>>,
+    DatabaseConnection(mut conn): DatabaseConnection,
+) -> impl IntoResponse {
+    let due_card_count = db::count_due_cards(&mut conn).unwrap_or_else(|_| -1);
+    let mut context = Context::new();
+    context.insert("due_card_count", &due_card_count);
     let body = tera.render("index.html", &context)
         .unwrap_or_else(|err| format!("Template error: {}", err));
 
@@ -127,29 +135,50 @@ struct LearnPageData {
     longitude: f32,
 }
 
-async fn learn_page(State(tera): State<Arc<Tera>>,
-                    DatabaseConnection(mut conn): DatabaseConnection, ) -> Html<String> {
-    use rand::prelude::SliceRandom;
+async fn select_random_card(DatabaseConnection(mut conn): DatabaseConnection) -> Result<Redirect, StatusCode> {
+    let random_due_card = select_random_card_fkt(&mut conn, -1)?;
 
-    let cards = db::get_all_due_cards(&mut conn).unwrap_or_else(|_| vec![]);
-
-    if let Some(card) = cards.choose(&mut rand::thread_rng()) {
-        let learn_data = LearnPageData {
-            id: card.id,
-            place_name: card.place_name.clone(),
-            latitude: card.latitude,
-            longitude: card.longitude,
-        };
-
-        let mut context = tera::Context::new();
-        context.insert("card", &learn_data);
-
-        let rendered = tera.render("learn.html", &context).unwrap();
-        Html(rendered)
+    if let Some(card) = random_due_card {
+        Ok(Redirect::to(&format!("/learn/{}", card.id)))
     } else {
-        Html("<p>No cards available. Please add some cards first.</p>".to_string())
+        Ok(Redirect::to("/"))  // Redirect to home if no cards are available
     }
 }
+
+fn select_random_card_fkt(mut conn: &mut SqliteConnection, exclude: i32) -> Result<Option<&Card>, StatusCode> {
+    use rand::prelude::SliceRandom;
+
+    let cards = db::get_all_due_cards(&mut conn).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
+        .iter().filter(|card| card.id != exclude).collect::<Vec<_>>();
+    let random_due_card = cards.choose(&mut rand::thread_rng());
+
+    Ok(random_due_card.cloned())
+}
+
+async fn learn_page(
+    State(tera): State<Arc<Tera>>,
+    DatabaseConnection(mut conn): DatabaseConnection,
+    Path(id): Path<i32>,
+) -> impl IntoResponse {
+    match db::get_card(&mut conn, id) {
+        Ok(card) => {
+            let learn_data = LearnPageData {
+                id: card.id,
+                place_name: card.place_name,
+                latitude: card.latitude,
+                longitude: card.longitude,
+            };
+
+            let mut context = Context::new();
+            context.insert("card", &learn_data);
+
+            let rendered = tera.render("learn.html", &context).unwrap();
+            Html(rendered).into_response()
+        }
+        Err(_) => (StatusCode::NOT_FOUND, "Card not found").into_response(),
+    }
+}
+
 
 #[derive(Deserialize)]
 struct AnswerSubmission {

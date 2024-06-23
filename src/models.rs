@@ -89,6 +89,11 @@ impl Card {
     /// Generally, the interval is increased by the ease_factor, but the interval is also capped at 365 days.
     pub fn review_passed(&mut self) {
         let now = chrono::Local::now().naive_local();
+        // If the card isn't due for review yet, this is a cramming review.
+        if self.next_review_at > now {
+            return self.review_cramming();
+        }
+
         self.last_reviewed_at = Some(now);
 
         // Calculate new interval
